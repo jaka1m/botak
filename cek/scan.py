@@ -11,7 +11,7 @@ OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# TWEAK DISINI: Semakin tinggi worker, semakin cepat (tapi beban CPU/Koneksi naik)
+# TWEAK DISINI
 MAX_WORKERS = 50 
 
 def check_proxy(proxy):
@@ -19,7 +19,7 @@ def check_proxy(proxy):
     ip, port = proxy['ip'], proxy['port']
     url = API_URL.format(ip=ip, port=port)
     try:
-        # Timeout diperkecil ke 3 detik agar tidak menunggu proxy mati terlalu lama
+        # Timeout 3 detik sudah cukup untuk Cloudflare/Serverless environment
         response = requests.get(url, timeout=3) 
         if response.status_code == 200:
             data = response.json()
@@ -40,17 +40,19 @@ def read_proxies():
             line = line.strip()
             if line and not line.startswith('#'):
                 parts = line.split(',')
-                proxies.append({
-                    'ip': parts[0].strip(),
-                    'port': parts[1].strip(),
-                    'country': parts[2].strip() if len(parts) > 2 else 'Unknown',
-                    'isp': parts[3].strip() if len(parts) > 3 else 'Unknown',
-                })
+                if len(parts) >= 2:
+                    proxies.append({
+                        'ip': parts[0].strip(),
+                        'port': parts[1].strip(),
+                        'country': parts[2].strip() if len(parts) > 2 else 'Unknown',
+                        'isp': parts[3].strip() if len(parts) > 3 else 'Unknown',
+                    })
     return proxies
 
 def main():
-    os.system('clear' if os.name == 'posix' else 'cls')
-    print("🚀 PROXY CHECKER - MULTITHREADED MODE")
+    # DIHAPUS: os.system('clear') penyebab error di GitHub Workflow
+    
+    print("🚀 PROXY CHECKER - RUNNING IN CI MODE")
     print("="*50)
     
     proxies = read_proxies()
@@ -66,7 +68,6 @@ def main():
     print(f"🧵 Threads: {MAX_WORKERS}")
     print("="*50 + "\n")
 
-    # Menggunakan ThreadPool untuk eksekusi paralel
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_proxy = {executor.submit(check_proxy, p): p for p in proxies}
         
@@ -75,14 +76,16 @@ def main():
             completed += 1
             is_alive, line, delay = future.result()
             
+            # Log lebih ringkas untuk GitHub Action agar tidak memenuhi log
             if is_alive:
                 active_list.append(line)
-                print(f"[{completed}/{total}] ✅ {line.split(',')[0]} ({delay})")
+                print(f"[{completed}/{total}] ✅ {line.split(',')[0]} | {delay}")
             else:
                 dead_list.append(line)
-                print(f"[{completed}/{total}] ❌ {line.split(',')[0]}")
+                # Opsi: matikan print kalau tidak mau log GitHub kepenuhan info dead proxy
+                # print(f"[{completed}/{total}] ❌ {line.split(',')[0]}")
 
-    # Simpan hasil akhir sekaligus (lebih efisien daripada tulis per baris)
+    # Simpan hasil
     with open(OUTPUT_ACTIVE, 'w') as f: f.write("\n".join(active_list))
     with open(OUTPUT_DEAD, 'w') as f: f.write("\n".join(dead_list))
 
