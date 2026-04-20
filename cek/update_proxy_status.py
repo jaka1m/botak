@@ -3,26 +3,28 @@ import time
 import os
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IP_FILE = os.path.join(BASE_DIR, 'file.txt')
-OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'active.txt')
+OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# Gunakan session untuk reuse koneksi
-session = requests.Session()
-session.headers.update({'User-Agent': 'Mozilla/5.0'})
+# Lock untuk write file aman
+write_lock = threading.Lock()
 
 def check_proxy(ip, port):
-    """Check proxy - super cepat tanpa retry"""
+    """Check proxy super cepat - tanpa retry, timeout kecil"""
     url = API_URL.format(ip=ip, port=port)
     try:
-        response = session.get(url, timeout=3)  # Timeout 3 detik
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('status', '').upper() == 'ACTIVE':
-                return True, data.get('delay', 'N/A'), data
+        # Gunakan session untuk koneksi reuse
+        with requests.Session() as session:
+            response = session.get(url, timeout=3)  # Timeout 3 detik
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status', '').upper() == 'ACTIVE':
+                    return True, data.get('delay', 'N/A'), data
         return False, None, None
     except:
         return False, None, None
@@ -47,6 +49,14 @@ def read_proxies():
                     })
     return proxies
 
+def save_result(active_list, dead_list):
+    """Save results ke file"""
+    with write_lock:
+        with open(OUTPUT_ACTIVE, 'w') as f:
+            f.write("\n".join(active_list))
+        with open(OUTPUT_DEAD, 'w') as f:
+            f.write("\n".join(dead_list))
+
 def main():
     os.system('clear' if os.name == 'posix' else 'cls')
     
@@ -64,47 +74,39 @@ def main():
     active = []
     dead = []
     start_time = time.time()
-    
-    # Gunakan thread pool (sesuaikan max_workers dengan kebutuhan)
-    max_workers = min(50, total)  # Maksimal 50 koneksi parallel
     completed = 0
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit semua task
-        future_to_proxy = {}
-        for p in proxies:
-            future = executor.submit(check_proxy, p['ip'], p['port'])
-            future_to_proxy[future] = p
+    # Gunakan ThreadPoolExecutor dengan 50 worker
+    with ThreadPoolExecutor(max_workers=50) as executor:
+        future_to_proxy = {
+            executor.submit(check_proxy, p['ip'], p['port']): p 
+            for p in proxies
+        }
         
-        # Proses hasil yang sudah selesai
         for future in as_completed(future_to_proxy):
             p = future_to_proxy[future]
             completed += 1
-            is_alive, delay, data = future.result()
             
-            print(f"[{completed}/{total}] {p['ip']}:{p['port']}...", end=" ", flush=True)
+            try:
+                is_alive, delay, data = future.result(timeout=3)
+            except:
+                is_alive, delay, data = False, None, None
+            
+            ip, port = p['ip'], p['port']
             
             if is_alive:
-                country = data.get('country', p['country']) if data else p['country']
-                isp = data.get('isp', p['isp']) if data else p['isp']
-                print(f"✅ ({delay})")
-                active.append(f"{p['ip']},{p['port']},{country},{isp}")
+                print(f"[{completed}/{total}] ✅ {ip}:{port} ({delay}ms)")
+                active.append(f"{ip},{port},{country},{isp}")
             else:
-                print(f"❌")
-                dead.append(f"{p['ip']},{p['port']},{p['country']},{p['isp']}")
+                print(f"[{completed}/{total}] ❌ {ip}:{port}")
+                dead.append(f"{ip},{port},{p['country']},{p['isp']}")
             
-            # Update file setiap 10 proxy (kurangi overhead I/O)
+            # Update file setiap 10 hasil atau di akhir
             if completed % 10 == 0 or completed == total:
-                with open(OUTPUT_ACTIVE, 'w') as f:
-                    f.write("\n".join(active))
-                with open(OUTPUT_DEAD, 'w') as f:
-                    f.write("\n".join(dead))
+                save_result(active, dead)
     
-    # Final write
-    with open(OUTPUT_ACTIVE, 'w') as f:
-        f.write("\n".join(active))
-    with open(OUTPUT_DEAD, 'w') as f:
-        f.write("\n".join(dead))
+    # Save final
+    save_result(active, dead)
     
     elapsed = time.time() - start_time
     
@@ -114,8 +116,6 @@ def main():
     print(f"⏱️  Waktu: {elapsed:.1f} detik")
     print(f"⚡ Kecepatan: {total/elapsed:.1f} proxy/detik")
     print("="*50)
-    
-    session.close()
 
 if __name__ == "__main__":
     main()
