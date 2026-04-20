@@ -45,10 +45,10 @@ jobs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
         # Tambahkan file ke staging area
-        if [ -f cek/proxyList.txt ]; then
-          git add cek/proxyList.txt && echo "✅ cek/proxyList.txt berhasil ditambahkan ke staging."
+        if [ -f cek/active.txt ]; then
+          git add cek/active.txt && echo "✅ cek/active.txt berhasil ditambahkan ke staging."
         else
-          echo "⚠️ cek/proxyList.txt tidak ditemukan."
+          echo "⚠️ cek/active.txt tidak ditemukan."
         fi
 
         if [ -f cek/dead.txt ]; then
