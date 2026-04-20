@@ -1,115 +1,96 @@
 import requests
 import csv
-import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Lock untuk menulis ke file secara aman
 alive_lock = threading.Lock()
 dead_lock = threading.Lock()
 
-def check_proxy(row, api_url_template, alive_file, dead_file):
-    if len(row) < 2:
-        return False
-    
-    ip, port = row[0].strip(), row[1].strip()
-    
-    # Validasi port
-    try:
-        port_int = int(port)
-        if not (1 <= port_int <= 65535):
-            print(f"Port tidak valid untuk {ip}:{port}")
-            return False
-    except ValueError:
-        print(f"Port bukan angka untuk {ip}:{port}")
-        return False
-    
-    api_url = api_url_template.format(ip=ip, port=port)
+def check_proxy(ip, port):
+    """Cek apakah proxy aktif"""
+    api_url = f"https://api-check.web.id/check?ip={ip}:{port}"
     
     try:
         response = requests.get(api_url, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("status", "").lower() == "active":
-            print(f"✓ {ip}:{port} is ALIVE")
-            with alive_lock:
-                with open(alive_file, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow([ip, port])
-            return True
+        
+        if response.status_code == 200:
+            data = response.json()
+            status = data.get("status", "").lower()
+            
+            if status == "active":
+                return True
+            else:
+                return False
         else:
-            print(f"✗ {ip}:{port} is DEAD (status: {data.get('status', 'unknown')})")
-            with dead_lock:
-                with open(dead_file, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow([ip, port])
             return False
             
-    except requests.exceptions.Timeout:
-        print(f"⏱ Timeout checking {ip}:{port}")
-    except requests.exceptions.ConnectionError:
-        print(f"🔌 Connection error for {ip}:{port}")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error checking {ip}:{port}: {type(e).__name__}")
-    except ValueError as ve:
-        print(f"📄 Error parsing JSON for {ip}:{port}: {ve}")
-    
-    return False
+    except Exception:
+        return False
 
 def main():
-    # Konfigurasi
-    input_file = os.getenv('IP_FILE', 'cek/file.txt')
-    alive_file = os.getenv('ALIVE_FILE', 'cek/proxyList.txt')
-    dead_file = os.getenv('DEAD_FILE', 'cek/dead.txt')
-    api_url_template = os.getenv('API_URL', 'https://api-check.web.id/check?ip={ip}:{port}')
-    max_workers = int(os.getenv('MAX_WORKERS', '50'))
-    timeout = int(os.getenv('TIMEOUT', '30'))
-
-    # Buat direktori jika belum ada
-    os.makedirs(os.path.dirname(alive_file), exist_ok=True)
-
+    input_file = "file.txt"
+    alive_file = "proxyList.txt"
+    dead_file = "dead.txt"
+    
     # Kosongkan file output
     open(alive_file, "w").close()
     open(dead_file, "w").close()
-
-    # Baca input file
+    
+    # Baca daftar proxy dari file.txt
+    proxies = []
     try:
         with open(input_file, "r") as f:
             reader = csv.reader(f)
-            rows = [row for row in reader if row and len(row) >= 2]
+            for row in reader:
+                if len(row) >= 4:  # IP, Port, Country, Provider
+                    ip = row[0].strip()
+                    port = row[1].strip()
+                    proxies.append((ip, port, row))  # Simpan row lengkap
     except FileNotFoundError:
-        print(f"❌ File {input_file} tidak ditemukan.")
+        print(f"Error: File {input_file} tidak ditemukan!")
         return
-    except Exception as e:
-        print(f"❌ Error membaca file: {e}")
+    
+    if not proxies:
+        print("Tidak ada proxy yang ditemukan di file.txt")
         return
-
-    if not rows:
-        print("⚠️ Tidak ada data proxy yang valid di file.")
-        return
-
-    print(f"📊 Memeriksa {len(rows)} proxy dengan {max_workers} thread...")
-    print("-" * 50)
-
-    # Eksekusi pengecekan
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(check_proxy, row, api_url_template, alive_file, dead_file)
-            for row in rows
-        ]
+    
+    print(f"Total proxy ditemukan: {len(proxies)}")
+    print("Memeriksa proxy...\n")
+    
+    alive_count = 0
+    dead_count = 0
+    
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_proxy = {
+            executor.submit(check_proxy, ip, port): (ip, port, row)
+            for ip, port, row in proxies
+        }
         
-        # Optional: tracking progress
-        completed = 0
-        for future in as_completed(futures):
-            completed += 1
-            if completed % 10 == 0:
-                print(f"📈 Progress: {completed}/{len(rows)}")
-
-    print("-" * 50)
-    print(f"✅ Selesai! Hasil pengecekan {len(rows)} proxy:")
-    print(f"   • ALIVE: {alive_file}")
-    print(f"   • DEAD:  {dead_file}")
+        for i, future in enumerate(as_completed(future_to_proxy), 1):
+            ip, port, row = future_to_proxy[future]
+            is_alive = future.result()
+            
+            if is_alive:
+                # Simpan ke proxyList.txt (format CSV lengkap)
+                with alive_lock:
+                    with open(alive_file, "a", newline="") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(row)
+                print(f"✓ [{i}/{len(proxies)}] {ip}:{port} - ALIVE")
+                alive_count += 1
+            else:
+                # Simpan ke dead.txt (format CSV lengkap)
+                with dead_lock:
+                    with open(dead_file, "a", newline="") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(row)
+                print(f"✗ [{i}/{len(proxies)}] {ip}:{port} - DEAD")
+                dead_count += 1
+    
+    print(f"\n===== HASIL ======")
+    print(f"✓ ALIVE: {alive_count} proxy -> {alive_file}")
+    print(f"✗ DEAD:  {dead_count} proxy -> {dead_file}")
+    print(f"Total: {len(proxies)} proxy")
 
 if __name__ == "__main__":
     main()
