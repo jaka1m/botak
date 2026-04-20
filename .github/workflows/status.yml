@@ -36,7 +36,7 @@ jobs:
         IP_FILE: './cek/file.txt'
         API_URL: 'https://api-check.web.id/check?ip={ip}:{port}' # Proxy check API URL
       run: |
-        python ./cek/update_proxy_status.py
+        python ./cek/scan.py
 
     # Step 5: Commit and push changes if any
     - name: 📤 Commit and Push Changes
