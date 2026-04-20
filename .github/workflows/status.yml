@@ -4,7 +4,6 @@ on:
   # Schedule workflow to run every 3 days at midnight
   schedule:
     - cron: '0 0 */3 * *'
-
   # Allow manual trigger of the workflow
   workflow_dispatch:
 
@@ -30,37 +29,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
 
-    # Step 4: Run the Python script to update proxy status
-    - name: 🔄 Update Proxy Status
-      env:
-        IP_FILE: './cek/file.txt'
-        API_URL: 'https://api-check.web.id/check?ip={ip}:{port}' # Proxy check API URL
+    # Step 4: Create necessary directories
+    - name: 📁 Create Directories
       run: |
-        python ./cek/update_proxy_status.py
+        mkdir -p cek
 
-    # Step 5: Commit and push changes if any
+    # Step 5: Run the Python script to update proxy status
+    - name: 🔄 Update Proxy Status
+      run: |
+        python update_proxy_status.py
+
+    # Step 6: Commit and push changes if any
     - name: 📤 Commit and Push Changes
       run: |
         git config --local user.name "github-actions[bot]"
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
-        # Tambahkan file ke staging area
-        if [ -f cek/proxyList.txt ]; then
-          git add cek/proxyList.txt && echo "✅ cek/proxyList.txt berhasil ditambahkan ke staging."
+        
+        # Add files to staging
+        git add cek/proxyList.txt cek/dead.txt 2>/dev/null || true
+        
+        # Check if there are changes
+        if git diff --cached --quiet; then
+          echo "✅ Tidak ada perubahan yang perlu di-commit"
         else
-          echo "⚠️ cek/proxyList.txt tidak ditemukan."
-        fi
-
-        if [ -f cek/dead.txt ]; then
-          git add cek/dead.txt && echo "✅ cek/dead.txt berhasil ditambahkan ke staging."
-        else
-          echo "⚠️ cek/dead.txt tidak ditemukan."
-        fi
-
-        # Commit hanya jika ada perubahan
-        if git diff --cached --exit-code; then
-          echo "✅ Tidak ada perubahan yang perlu di-commit."
-        else
-          git commit -m "🔄 Update proxy IP status" && echo "✅ Perubahan berhasil di-commit."
-          git push && echo "🚀 Perubahan berhasil di-push ke repository."
+          git commit -m "🔄 Update proxy IP status - $(date +'%Y-%m-%d %H:%M:%S')"
+          git push
+          echo "✅ Perubahan berhasil di-push ke repository"
         fi
