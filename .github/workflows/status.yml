@@ -1,66 +1,46 @@
 name: 🌐 Update Proxy IP Status
 
 on:
-  # Schedule workflow to run every 3 days at midnight
   schedule:
-    - cron: '0 0 */3 * *'
-
-  # Allow manual trigger of the workflow
-  workflow_dispatch:
+    - cron: '0 0 */3 * *' # Setiap 3 hari sekali
+  workflow_dispatch: # Bisa dijalankan manual
 
 jobs:
   update-proxies:
     runs-on: ubuntu-latest
-    name: 🚀 Update Proxy IP Status
-
+    
     steps:
-    # Step 1: Checkout the repository
     - name: 📂 Checkout Repository
       uses: actions/checkout@v3
 
-    # Step 2: Set up Python environment
     - name: 🐍 Set Up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
+        python-version: '3.10'
 
-    # Step 3: Install Python dependencies
     - name: 📦 Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests
+        pip install aiohttp  # WAJIB untuk script async
 
-    # Step 4: Run the Python script to update proxy status
     - name: 🔄 Update Proxy Status
-      env:
-        IP_FILE: './cek/file.txt'
-        API_URL: 'https://api-check.web.id/check?ip={ip}:{port}' # Proxy check API URL
       run: |
         python ./cek/scan.py
 
-    # Step 5: Commit and push changes if any
     - name: 📤 Commit and Push Changes
       run: |
         git config --local user.name "github-actions[bot]"
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-        # Tambahkan file ke staging area
-        if [ -f cek/proxyList.txt ]; then
-          git add cek/proxyList.txt && echo "✅ cek/proxyList.txt berhasil ditambahkan ke staging."
-        else
-          echo "⚠️ cek/proxyList.txt tidak ditemukan."
-        fi
+        # Menambahkan file hasil ke staging
+        git add cek/proxyList.txt || true
+        git add cek/dead.txt || true
 
-        if [ -f cek/dead.txt ]; then
-          git add cek/dead.txt && echo "✅ cek/dead.txt berhasil ditambahkan ke staging."
+        # Commit hanya jika ada perubahan isi file
+        if git diff --cached --quiet; then
+          echo "✅ Tidak ada perubahan status proxy."
         else
-          echo "⚠️ cek/dead.txt tidak ditemukan."
-        fi
-
-        # Commit hanya jika ada perubahan
-        if git diff --cached --exit-code; then
-          echo "✅ Tidak ada perubahan yang perlu di-commit."
-        else
-          git commit -m "🔄 Update proxy IP status" && echo "✅ Perubahan berhasil di-commit."
-          git push && echo "🚀 Perubahan berhasil di-push ke repository."
+          git commit -m "🔄 Auto Update Proxy Status [$(date +'%Y-%m-%d %H:%M:%S')]"
+          git push
+          echo "🚀 Berhasil update repository."
         fi
