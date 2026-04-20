@@ -1,40 +1,36 @@
-import requests
-import os
-import time
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+Percepat proses  biar mencapai 100 % tanpa pakai ThreadPoolExecutor
 
-# Konfigurasi
+
+import requests
+import time
+import os
+from datetime import datetime
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IP_FILE = os.path.join(BASE_DIR, 'file.txt')
 OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# TWEAK DISINI: 50-100 worker biasanya aman untuk GitHub Runner
-MAX_WORKERS = 50 
-
-def check_proxy(proxy):
-    """Fungsi pengecekan tunggal untuk thread"""
-    ip, port = proxy['ip'], proxy['port']
+def check_proxy(ip, port):
+    """Check proxy - tanpa retry, timeout kecil"""
     url = API_URL.format(ip=ip, port=port)
     try:
-        # Timeout 3 detik agar tetap cepat
-        response = requests.get(url, timeout=3) 
+        response = requests.get(url, timeout=0)  # Timeout 5 detik
         if response.status_code == 200:
             data = response.json()
             if data.get('status', '').upper() == 'ACTIVE':
-                delay = data.get('delay', 'N/A')
-                country = data.get('country', proxy['country'])
-                isp = data.get('isp', proxy['isp'])
-                return True, f"{ip},{port},{country},{isp}", delay
-        return False, f"{ip},{port},{proxy['country']},{proxy['isp']}", None
+                return True, data.get('delay', 'N/A'), data
+        return False, None, None
     except:
-        return False, f"{ip},{port},{proxy['country']},{proxy['isp']}", None
+        return False, None, None
 
 def read_proxies():
     proxies = []
-    if not os.path.exists(IP_FILE): return []
+    if not os.path.exists(IP_FILE):
+        print(f"❌ File tidak ditemukan: {IP_FILE}")
+        return []
+    
     with open(IP_FILE, 'r') as f:
         for line in f:
             line = line.strip()
@@ -50,50 +46,48 @@ def read_proxies():
     return proxies
 
 def main():
-    # PERBAIKAN: Hapus os.system('clear') agar tidak error di GitHub Actions
-    print("\n🚀 PROXY CHECKER - MULTITHREADED MODE")
+    os.system('clear' if os.name == 'posix' else 'cls')
+    
+    print("\n" + "="*50)
+    print("🚀 PROXY CHECKER - SUPER CEPAT")
     print("="*50)
+    print(f"⏰ Mulai: {datetime.now().strftime('%H:%M:%S')}\n")
     
     proxies = read_proxies()
     if not proxies:
-        print("❌ Tidak ada data di file.txt!"); return
-
+        print("❌ Tidak ada proxy!")
+        return
+    
     total = len(proxies)
-    active_list = []
-    dead_list = []
+    active = []
+    dead = []
     start_time = time.time()
-
-    print(f"📦 Total Proxy : {total}")
-    print(f"🧵 Threads      : {MAX_WORKERS}")
-    print("="*50 + "\n")
-
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_proxy = {executor.submit(check_proxy, p): p for p in proxies}
+    
+    for idx, p in enumerate(proxies, 1):
+        ip, port = p['ip'], p['port']
+        print(f"[{idx}/{total}] {ip}:{port}...", end=" ", flush=True)
         
-        completed = 0
-        for future in as_completed(future_to_proxy):
-            completed += 1
-            is_alive, line, delay = future.result()
-            
-            # Info log 1 per 1 tetap dipertahankan
-            if is_alive:
-                active_list.append(line)
-                print(f"[{completed}/{total}] ✅ {line.split(',')[0]}:{line.split(',')[1]} | {delay}")
-            else:
-                dead_list.append(line)
-                # Opsional: Bisa di-comment jika ingin log GitHub lebih bersih
-                # print(f"[{completed}/{total}] ❌ {line.split(',')[0]}")
-
-    # Simpan hasil
-    with open(OUTPUT_ACTIVE, 'w') as f: f.write("\n".join(active_list))
-    with open(OUTPUT_DEAD, 'w') as f: f.write("\n".join(dead_list))
-
+        is_alive, delay, data = check_proxy(ip, port)
+        
+        if is_alive:
+            print(f"✅ ({delay})")
+            active.append(f"{ip},{port},{country},{isp}")
+        else:
+            print(f"❌")
+            dead.append(f"{ip},{port},{p['country']},{p['isp']}")
+        
+        # Update file setiap saat
+        with open(OUTPUT_ACTIVE, 'w') as f:
+            f.write("\n".join(active))
+        with open(OUTPUT_DEAD, 'w') as f:
+            f.write("\n".join(dead))
+    
     elapsed = time.time() - start_time
+    
     print("\n" + "="*50)
-    print(f"✅ Selesai!")
-    print(f"   - Active : {len(active_list)}")
-    print(f"   - Dead   : {len(dead_list)}")
-    print(f"⏱️ Waktu    : {elapsed:.2f} detik")
+    print(f"✅ Active: {len(active)}")
+    print(f"❌ Dead: {len(dead)}")
+    print(f"⏱️  Waktu: {elapsed:.1f} detik")
     print("="*50)
 
 if __name__ == "__main__":
