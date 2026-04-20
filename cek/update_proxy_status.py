@@ -13,12 +13,12 @@ OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# Pengaturan kecepatan SUPER CEPAT
-MAX_WORKERS = 5   # 5 proxy dicek bersamaan
-TIMEOUT = 1       # Timeout 1 detik (super cepat)
+# Pengaturan kecepatan extreme
+MAX_WORKERS = 5  # 5 proxy sekaligus
+TIMEOUT = 1      # Timeout 1 detik (super cepat!)
 
 def check_proxy(ip, port):
-    """Check proxy - super cepat dengan timeout 1 detik"""
+    """Check proxy - timeout 1 detik, tanpa retry"""
     url = API_URL.format(ip=ip, port=port)
     
     try:
@@ -32,21 +32,21 @@ def check_proxy(ip, port):
             delay = data.get('delay', 'N/A')
             
             if status == 'ACTIVE':
-                return True, f"✅ {delay} ({elapsed:.1f}s)", data
+                return True, f"ACTIVE ({delay}, {elapsed:.1f}s)", data
             else:
-                return False, "❌ INACTIVE", data
+                return False, "INACTIVE", data
         else:
-            return False, f"❌ HTTP {response.status_code}", None
+            return False, f"HTTP {response.status_code}", None
             
     except requests.exceptions.Timeout:
-        return False, "❌ TIMEOUT", None
+        return False, "TIMEOUT", None
     except requests.exceptions.ConnectionError:
-        return False, "❌ CONN ERR", None
+        return False, "CONN ERR", None
     except Exception:
-        return False, "❌ ERROR", None
+        return False, "ERROR", None
 
 def read_proxies():
-    """Baca proxy dari file.txt format: IP,Port,Country,ISP"""
+    """Baca proxy dari file.txt"""
     proxies = []
     
     if not os.path.exists(IP_FILE):
@@ -73,7 +73,7 @@ def read_proxies():
         return []
 
 def save_results(active_list, dead_list):
-    """Simpan hasil ke file dengan format CSV"""
+    """Simpan hasil ke file"""
     with open(OUTPUT_ACTIVE, 'w') as f:
         for item in active_list:
             f.write(f"{item['ip']},{item['port']},{item['country']},{item['isp']}\n")
@@ -86,7 +86,7 @@ def main():
     os.system('clear' if os.name == 'posix' else 'cls')
     
     print("\n" + "="*60)
-    print("⚡ PROXY CHECKER - SUPER CEPAT ⚡")
+    print("⚡ PROXY CHECKER - EXTREME FAST ⚡")
     print("="*60)
     print(f"📁 Path: {BASE_DIR}")
     print(f"⚡ Concurrent: {MAX_WORKERS} proxy sekaligus")
@@ -111,7 +111,7 @@ def main():
     completed = 0
     start_time = time.time()
     
-    # Concurrent checking dengan 5 thread
+    # Concurrent checking dengan timeout 1 detik
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit semua tugas
         future_to_proxy = {
@@ -126,13 +126,13 @@ def main():
             ip, port = proxy['ip'], proxy['port']
             
             try:
-                is_alive, status_msg, api_data = future.result(timeout=TIMEOUT+1)
+                is_alive, status_msg, api_data = future.result(timeout=TIMEOUT+0.5)
                 
                 if is_alive:
                     final_country = api_data.get('country', proxy['country']) if api_data else proxy['country']
                     final_isp = api_data.get('isp', proxy['isp']) if api_data else proxy['isp']
                     
-                    print(f"[{completed:3d}/{total}] {ip:20s}:{port:5s} {status_msg}")
+                    print(f"[{completed}/{total}] ✅ {ip}:{port} - {status_msg}")
                     active.append({
                         'ip': ip,
                         'port': port,
@@ -140,7 +140,7 @@ def main():
                         'isp': final_isp
                     })
                 else:
-                    print(f"[{completed:3d}/{total}] {ip:20s}:{port:5s} {status_msg}")
+                    print(f"[{completed}/{total}] ❌ {ip}:{port} - {status_msg}")
                     dead.append({
                         'ip': ip,
                         'port': port,
@@ -148,18 +148,18 @@ def main():
                         'isp': proxy['isp']
                     })
                 
-                # Update file setiap 5 hasil atau selesai
-                if completed % 5 == 0 or completed == total:
-                    save_results(active, dead)
+                # Update file setiap selesai (realtime)
+                save_results(active, dead)
                     
-            except Exception as e:
-                print(f"[{completed:3d}/{total}] {ip:20s}:{port:5s} ❌ ERROR")
+            except Exception:
+                print(f"[{completed}/{total}] ❌ {ip}:{port} - TIMEOUT/ERROR")
                 dead.append({
                     'ip': ip,
                     'port': port,
                     'country': proxy['country'],
                     'isp': proxy['isp']
                 })
+                save_results(active, dead)
     
     # Save final
     save_results(active, dead)
@@ -179,12 +179,16 @@ def main():
     
     # Preview hasil
     if active:
-        print(f"\n📄 Preview {OUTPUT_ACTIVE}:")
-        print("-"*50)
-        for item in active[:10]:
+        print(f"\n📄 Preview {OUTPUT_ACTIVE} (aktif):")
+        print("-"*40)
+        for item in active[:5]:
             print(f"   {item['ip']},{item['port']},{item['country']},{item['isp']}")
-        if len(active) > 10:
-            print(f"   ... dan {len(active)-10} lainnya")
+    
+    if dead:
+        print(f"\n📄 Preview {OUTPUT_DEAD} (mati):")
+        print("-"*40)
+        for item in dead[:3]:
+            print(f"   {item['ip']},{item['port']},{item['country']},{item['isp']}")
     
     print("\n✨ Selesai!\n")
 
