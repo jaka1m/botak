@@ -1,60 +1,57 @@
-# Proxy Aktif - 2026-04-20 02:18:35
-# Total: 57
-
-213.159.76.175:443
-45.83.143.35:8443
-213.159.76.202:2053
-213.159.76.202:8443
-2.56.206.114:2053
-152.32.181.246:44070
-193.123.90.82:12648
-2.56.206.64:443
-176.97.66.175:443
-34.22.190.30:443
-95.164.62.196:443
-185.82.218.224:9443
-170.64.152.77:7443
-152.67.101.72:23010
-130.162.193.183:15401
-91.90.193.24:443
-94.156.35.144:18836
-91.215.153.85:443
-192.18.150.121:27620
-144.22.144.168:4242
-150.230.27.23:16504
-146.235.59.153:8443
-132.226.163.224:8443
-172.98.207.58:443
-132.226.163.224:2053
-38.180.79.9:443
-176.10.125.114:443
-179.43.144.10:8000
-91.245.225.69:443
-38.180.85.203:443
-185.195.69.200:8443
-185.195.69.209:2053
-194.87.18.92:443
-45.95.232.18:2053
-45.95.232.18:8443
-45.85.93.49:443
-91.192.102.170:8443
-91.192.102.170:2053
-91.245.225.79:2053
-91.245.225.79:8443
-94.131.12.56:443
-91.192.102.55:443
-156.230.12.71:443
-81.91.214.85:443
-81.91.214.162:443
-193.124.92.170:443
-45.155.249.66:443
-128.140.11.25:25690
-159.69.92.30:443
-91.107.166.26:2053
-91.107.166.26:8888
-91.107.134.254:45603
-91.107.134.254:49222
-104.248.17.101:443
-18.184.55.249:443
-18.184.27.249:443
-18.197.218.69:443
+213.159.76.175,443,Armenia,WorkTitans B.V.
+45.83.143.35,8443,Armenia,WorkTitans B.V.
+213.159.76.202,2053,Armenia,WorkTitans B.V.
+213.159.76.202,8443,Armenia,WorkTitans B.V.
+2.56.206.114,2053,Armenia,Proitlab LLC
+152.32.181.246,44070,United Arab Emirates,UCLOUD INFORMATION TECHNOLOGY (HK) LIMITED
+193.123.90.82,12648,United Arab Emirates,Oracle Corporation
+2.56.206.64,443,Armenia,Proitlab LLC
+176.97.66.175,443,United Arab Emirates,CLOUD-NETWORK
+34.22.190.30,443,Belgium,Google LLC
+95.164.62.196,443,United States,WorkTitans B.V.
+185.82.218.224,9443,Bulgaria,Green Floid LLC
+170.64.152.77,7443,Australia,DigitalOcean, LLC
+152.67.101.72,23010,Australia,Oracle Corporation
+130.162.193.183,15401,Australia,Oracle Corporation
+91.90.193.24,443,Switzerland,Green Floid LLC
+94.156.35.144,18836,Bulgaria,Belcloud LTD
+91.215.153.85,443,Bulgaria,Green Floid LLC
+192.18.150.121,27620,Canada,Oracle Corporation
+144.22.144.168,4242,Brazil,Oracle Corporation
+150.230.27.23,16504,Canada,Oracle Corporation
+146.235.59.153,8443,Brazil,Oracle Corporation
+132.226.163.224,8443,Brazil,Oracle Corporation
+172.98.207.58,443,Canada,Centrilogic
+132.226.163.224,2053,Brazil,Oracle Corporation
+38.180.79.9,443,Brazil,M247 Europe SRL
+176.10.125.114,443,Switzerland,Datasource AG
+179.43.144.10,8000,Switzerland,Private Layer INC
+91.245.225.69,443,Switzerland,Big Data Host LLC
+38.180.85.203,443,Switzerland,Private Layer INC
+185.195.69.200,8443,Switzerland,Datasource AG
+185.195.69.209,2053,Switzerland,Datasource AG
+194.87.18.92,443,Switzerland,Baxet Group Inc.
+45.95.232.18,2053,Switzerland,Global Connectivity Solutions LLP
+45.95.232.18,8443,Switzerland,Global Connectivity Solutions LLP
+45.85.93.49,443,Switzerland,Serva ONE LTD
+91.192.102.170,8443,Switzerland,Datasource AG
+91.192.102.170,2053,Switzerland,Datasource AG
+91.245.225.79,2053,Switzerland,Big Data Host LLC
+91.245.225.79,8443,Switzerland,Big Data Host LLC
+94.131.12.56,443,Switzerland,WorkTitans B.V.
+91.192.102.55,443,Switzerland,Datasource AG
+156.230.12.71,443,Hong Kong,263 Global Communications Limited
+81.91.214.85,443,Czechia,OvaNet, a.s.
+81.91.214.162,443,Czechia,OvaNet, a.s.
+193.124.92.170,443,Germany,Big Data Host LLC
+45.155.249.66,443,Netherlands,servinga GmbH
+128.140.11.25,25690,Germany,Hetzner Online GmbH
+159.69.92.30,443,Germany,Hetzner Online GmbH
+91.107.166.26,2053,Germany,Hetzner Online AG
+91.107.166.26,8888,Germany,Hetzner Online AG
+91.107.134.254,45603,Germany,Hetzner Online AG
+91.107.134.254,49222,Germany,Hetzner Online AG
+104.248.17.101,443,Germany,DigitalOcean, LLC
+18.184.55.249,443,Germany,Amazon Technologies Inc.
+18.184.27.249,443,Germany,Amazon Technologies Inc.
+18.197.218.69,443,Germany,Amazon Technologies Inc.
