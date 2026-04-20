@@ -2,8 +2,8 @@ name: 🌐 Update Proxy IP Status
 
 on:
   schedule:
-    - cron: '0 0 */3 * *' # Setiap 3 hari sekali
-  workflow_dispatch: # Bisa dijalankan manual
+    - cron: '0 0 */3 * *'
+  workflow_dispatch:
 
 jobs:
   update-proxies:
@@ -21,26 +21,24 @@ jobs:
     - name: 📦 Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install aiohttp  # WAJIB untuk script async
+        pip install aiohttp
 
     - name: 🔄 Update Proxy Status
       run: |
-        python ./cek/scan.py
+        # Menggunakan flag -u agar log muncul secara Real-Time
+        python -u ./cek/scan.py
 
     - name: 📤 Commit and Push Changes
       run: |
         git config --local user.name "github-actions[bot]"
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
-        # Menambahkan file hasil ke staging
+        
         git add cek/proxyList.txt || true
         git add cek/dead.txt || true
 
-        # Commit hanya jika ada perubahan isi file
         if git diff --cached --quiet; then
-          echo "✅ Tidak ada perubahan status proxy."
+          echo "✅ Tidak ada perubahan."
         else
-          git commit -m "🔄 Auto Update Proxy Status [$(date +'%Y-%m-%d %H:%M:%S')]"
+          git commit -m "🔄 Update Proxy Status [$(date +'%Y-%m-%d %H:%M:%S')]"
           git push
-          echo "🚀 Berhasil update repository."
         fi
