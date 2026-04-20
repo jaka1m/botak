@@ -5,7 +5,7 @@ from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IP_FILE = os.path.join(BASE_DIR, 'file.txt')
-OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'active.txt')
+OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
