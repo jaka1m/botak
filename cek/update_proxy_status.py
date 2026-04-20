@@ -13,7 +13,7 @@ def check_proxy(ip, port):
     """Check proxy - tanpa retry, timeout kecil"""
     url = API_URL.format(ip=ip, port=port)
     try:
-        response = requests.get(url, timeout=2)  # Timeout 5 detik
+        response = requests.get(url, timeout=2)  # Timeout 2 detik
         if response.status_code == 200:
             data = response.json()
             if data.get('status', '').upper() == 'ACTIVE':
