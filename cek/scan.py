@@ -11,7 +11,7 @@ OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# TWEAK DISINI
+# TWEAK DISINI: 50-100 worker biasanya aman untuk GitHub Runner
 MAX_WORKERS = 50 
 
 def check_proxy(proxy):
@@ -19,7 +19,7 @@ def check_proxy(proxy):
     ip, port = proxy['ip'], proxy['port']
     url = API_URL.format(ip=ip, port=port)
     try:
-        # Timeout 3 detik sudah cukup untuk Cloudflare/Serverless environment
+        # Timeout 3 detik agar tetap cepat
         response = requests.get(url, timeout=3) 
         if response.status_code == 200:
             data = response.json()
@@ -50,22 +50,21 @@ def read_proxies():
     return proxies
 
 def main():
-    # DIHAPUS: os.system('clear') penyebab error di GitHub Workflow
-    
-    print("🚀 PROXY CHECKER - RUNNING IN CI MODE")
+    # PERBAIKAN: Hapus os.system('clear') agar tidak error di GitHub Actions
+    print("\n🚀 PROXY CHECKER - MULTITHREADED MODE")
     print("="*50)
     
     proxies = read_proxies()
     if not proxies:
-        print("❌ Tidak ada proxy!"); return
+        print("❌ Tidak ada data di file.txt!"); return
 
     total = len(proxies)
     active_list = []
     dead_list = []
     start_time = time.time()
 
-    print(f"📦 Total Proxy: {total}")
-    print(f"🧵 Threads: {MAX_WORKERS}")
+    print(f"📦 Total Proxy : {total}")
+    print(f"🧵 Threads      : {MAX_WORKERS}")
     print("="*50 + "\n")
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -76,13 +75,13 @@ def main():
             completed += 1
             is_alive, line, delay = future.result()
             
-            # Log lebih ringkas untuk GitHub Action agar tidak memenuhi log
+            # Info log 1 per 1 tetap dipertahankan
             if is_alive:
                 active_list.append(line)
-                print(f"[{completed}/{total}] ✅ {line.split(',')[0]} | {delay}")
+                print(f"[{completed}/{total}] ✅ {line.split(',')[0]}:{line.split(',')[1]} | {delay}")
             else:
                 dead_list.append(line)
-                # Opsi: matikan print kalau tidak mau log GitHub kepenuhan info dead proxy
+                # Opsional: Bisa di-comment jika ingin log GitHub lebih bersih
                 # print(f"[{completed}/{total}] ❌ {line.split(',')[0]}")
 
     # Simpan hasil
@@ -91,8 +90,10 @@ def main():
 
     elapsed = time.time() - start_time
     print("\n" + "="*50)
-    print(f"✅ Selesai! Active: {len(active_list)} | Dead: {len(dead_list)}")
-    print(f"⏱️ Total Waktu: {elapsed:.2f} detik")
+    print(f"✅ Selesai!")
+    print(f"   - Active : {len(active_list)}")
+    print(f"   - Dead   : {len(dead_list)}")
+    print(f"⏱️ Waktu    : {elapsed:.2f} detik")
     print("="*50)
 
 if __name__ == "__main__":
