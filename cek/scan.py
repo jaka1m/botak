@@ -2,193 +2,184 @@ import asyncio
 import aiohttp
 import os
 import time
-import ipaddress
 from datetime import datetime
 
+# Path otomatis
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IP_FILE = os.path.join(BASE_DIR, 'file.txt')
 OUTPUT_ACTIVE = os.path.join(BASE_DIR, 'proxyList.txt')
 OUTPUT_DEAD = os.path.join(BASE_DIR, 'dead.txt')
 API_URL = 'https://api-check.web.id/check?ip={ip}:{port}'
 
-# OPTIMASI: Kurangi concurrent limit untuk GitHub Actions
-CONCURRENT_LIMIT = 50  # Turunkan dari 150 ke 50
+# Limit simultan (100-200 aman untuk GitHub Actions)
+CONCURRENT_LIMIT = 150 
 
-# OPTIMASI: Hanya scan port yang paling mungkin
-DEFAULT_PORTS = [443]  # Mulai dengan 443 dulu, lebih cepat
+# Set untuk tracking IP:Port yang sudah diproses
+processed_proxies = set()
 
-# OPTIMASI: Batasi total probe
-MAX_PROBES = 5000  # Maksimal 5000 probe per run
-
-def expand_cidr(cidr):
-    """Expand CIDR dengan optimasi untuk /32"""
-    try:
-        # Skip /32 karena tidak efisien
-        if cidr.endswith('/32'):
-            return []
-        
-        network = ipaddress.ip_network(cidr, strict=False)
-        
-        # Batasi jumlah IP per CIDR
-        max_ips = 256  # Maksimal /24
-        ips = list(network.hosts())
-        
-        if len(ips) > max_ips:
-            print(f"⚠️  CIDR {cidr} terlalu besar ({len(ips)} IP), dibatasi ke {max_ips}", flush=True)
-            ips = ips[:max_ips]
-        
-        return [str(ip) for ip in ips]
-    except Exception as e:
-        print(f"Error expanding CIDR {cidr}: {e}")
-        return []
-
-def parse_line(line):
-    """Parse line dengan filter untuk /32"""
-    line = line.strip()
-    if not line or line.startswith('#'):
-        return None
-    
-    parts = line.split(',')
-    
-    # Format CIDR - SKIP /32
-    if '/' in parts[0] and len(parts) >= 3:
-        cidr = parts[0].strip()
-        
-        # Skip CIDR /32 karena tidak efisien
-        if cidr.endswith('/32'):
-            return None
-        
-        ips = expand_cidr(cidr)
-        if ips:
-            results = []
-            country = parts[1].strip() if len(parts) > 1 else 'Unknown'
-            isp = parts[2].strip() if len(parts) > 2 else 'Unknown'
-            
-            for ip in ips:
-                for port in DEFAULT_PORTS:
-                    results.append({
-                        'ip': ip,
-                        'port': str(port),
-                        'country': country,
-                        'isp': isp,
-                    })
-            
-            if results:
-                print(f"📡 {cidr} → {len(ips)} IP × {len(DEFAULT_PORTS)} port = {len(results)} probe", flush=True)
-            return results
-        return None
-    
-    # Format proxy biasa
-    elif len(parts) >= 2 and not '/' in parts[0]:
-        try:
-            ipaddress.ip_address(parts[0].strip())
-            return [{
-                'ip': parts[0].strip(),
-                'port': parts[1].strip(),
-                'country': parts[2].strip() if len(parts) > 2 else 'Unknown',
-                'isp': parts[3].strip() if len(parts) > 3 else 'Unknown',
-            }]
-        except:
-            return None
-    
-    return None
-
-def read_proxies():
-    proxies = []
-    if not os.path.exists(IP_FILE):
-        print(f"❌ File {IP_FILE} tidak ditemukan!", flush=True)
-        return []
-    
-    print(f"\n📖 Membaca file: {IP_FILE}", flush=True)
-    print("="*50, flush=True)
-    
-    with open(IP_FILE, 'r') as f:
-        for line in f:
-            result = parse_line(line)
-            if result:
-                proxies.extend(result)
-                
-                # Batasi total probe
-                if len(proxies) >= MAX_PROBES:
-                    print(f"⚠️  Mencapai batas maksimal {MAX_PROBES} probe, berhenti membaca", flush=True)
-                    break
-    
-    print("="*50, flush=True)
-    print(f"📊 Total probe yang akan di-scan: {len(proxies)}", flush=True)
-    return proxies
-
-async def check_proxy(session, p, semaphore, timeout=5):  # Turunkan timeout ke 5 detik
+async def check_proxy(session, p, semaphore):
     ip, port = p['ip'], p['port']
     url = API_URL.format(ip=ip, port=port)
     
     async with semaphore:
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+            # Timeout diperketat ke 7 detik agar tidak terlalu lama menggantung
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as response:
                 if response.status == 200:
                     data = await response.json()
                     if data.get('status', '').upper() == 'ACTIVE':
                         delay = data.get('delay', 'N/A')
+                        print(f"✅ {ip}:{port} | {delay}", flush=True)
                         return True, p, delay
+                
+                # Jika tidak aktif (tapi respon 200) atau status bukan ACTIVE
+                print(f"❌ {ip}:{port} | Status: {response.status}", flush=True)
                 return False, p, None
-        except:
+        except Exception:
+            # Print minimal agar log tetap berjalan meski error/timeout
+            print(f"❌ {ip}:{port} | Timeout/Error", flush=True)
             return False, p, None
+
+def read_proxies():
+    proxies = []
+    processed_proxies.clear()  # Reset set setiap kali baca
+    
+    if not os.path.exists(IP_FILE):
+        return []
+    
+    with open(IP_FILE, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                parts = line.split(',')
+                if len(parts) >= 2:
+                    ip = parts[0].strip()
+                    port = parts[1].strip()
+                    proxy_key = f"{ip}:{port}"
+                    
+                    # Skip jika IP:Port sudah diproses
+                    if proxy_key in processed_proxies:
+                        print(f"⚠️ SKIP DUPLIKAT: {proxy_key}", flush=True)
+                        continue
+                    
+                    processed_proxies.add(proxy_key)
+                    
+                    proxies.append({
+                        'ip': ip,
+                        'port': port,
+                        'country': parts[2].strip() if len(parts) > 2 else 'Unknown',
+                        'isp': parts[3].strip() if len(parts) > 3 else 'Unknown',
+                    })
+    
+    print(f"📋 Total unique proxy setelah filter duplikat: {len(proxies)}", flush=True)
+    return proxies
+
+def merge_with_existing_results(new_active, new_dead):
+    """Merge hasil baru dengan hasil yang sudah ada (menghindari duplikat di output final)"""
+    
+    # Baca hasil yang sudah ada (jika ada)
+    existing_active = set()
+    existing_dead = set()
+    
+    if os.path.exists(OUTPUT_ACTIVE):
+        with open(OUTPUT_ACTIVE, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    # Ambil IP:Port dari baris (3 field pertama)
+                    parts = line.split(',')
+                    if len(parts) >= 2:
+                        existing_active.add(f"{parts[0]}:{parts[1]}")
+    
+    if os.path.exists(OUTPUT_DEAD):
+        with open(OUTPUT_DEAD, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    parts = line.split(',')
+                    if len(parts) >= 2:
+                        existing_dead.add(f"{parts[0]}:{parts[1]}")
+    
+    # Filter hasil baru menghindari duplikat dengan hasil lama
+    unique_active = []
+    for line in new_active:
+        parts = line.split(',')
+        if len(parts) >= 2:
+            proxy_key = f"{parts[0]}:{parts[1]}"
+            if proxy_key not in existing_active and proxy_key not in existing_dead:
+                unique_active.append(line)
+            else:
+                print(f"⚠️ SKIP DUPLIKAT DENGAN HASIL LAMA: {proxy_key}", flush=True)
+    
+    unique_dead = []
+    for line in new_dead:
+        parts = line.split(',')
+        if len(parts) >= 2:
+            proxy_key = f"{parts[0]}:{parts[1]}"
+            if proxy_key not in existing_active and proxy_key not in existing_dead:
+                unique_dead.append(line)
+            else:
+                print(f"⚠️ SKIP DUPLIKAT DENGAN HASIL LAMA: {proxy_key}", flush=True)
+    
+    return unique_active, unique_dead
+
+def save_results(active_results, dead_results):
+    """Simpan hasil dengan merge ke file yang sudah ada (append jika tidak duplikat)"""
+    
+    # Merge dengan hasil yang sudah ada
+    final_active, final_dead = merge_with_existing_results(active_results, dead_results)
+    
+    # Append ke file yang sudah ada (tanpa duplikat)
+    if final_active:
+        with open(OUTPUT_ACTIVE, 'a') as f:
+            for line in final_active:
+                f.write(line + '\n')
+    
+    if final_dead:
+        with open(OUTPUT_DEAD, 'a') as f:
+            for line in final_dead:
+                f.write(line + '\n')
+    
+    return len(final_active), len(final_dead)
 
 async def main():
     print("="*50, flush=True)
-    print(f"🚀 STARTING SCANNER - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
-    print("="*50, flush=True)
-    print(f"⚙️  Konfigurasi Optimasi:")
-    print(f"   - Concurrent limit: {CONCURRENT_LIMIT}")
-    print(f"   - Port yang di-scan: {DEFAULT_PORTS}")
-    print(f"   - Timeout: 5 detik")
-    print(f"   - Max probes: {MAX_PROBES}")
+    print(f"🚀 STARTING SCANNER - {datetime.now().strftime('%H:%M:%S')}", flush=True)
     print("="*50, flush=True)
     
     proxies = read_proxies()
     if not proxies:
-        print("❌ Tidak ada probe untuk di-scan!", flush=True)
+        print("❌ File sumber kosong!", flush=True)
         return
-    
+
     semaphore = asyncio.Semaphore(CONCURRENT_LIMIT)
-    connector = aiohttp.TCPConnector(limit=CONCURRENT_LIMIT, ssl=False, use_dns_cache=True)
     
-    start_scan = time.time()
-    completed = 0
-    total = len(proxies)
-    active_results = []
-    dead_results = []
+    # Optimasi: Matikan verifikasi SSL & gunakan DNS cache agar tidak 'stuck'
+    connector = aiohttp.TCPConnector(limit=CONCURRENT_LIMIT, ssl=False, use_dns_cache=True)
     
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [check_proxy(session, p, semaphore) for p in proxies]
+        results = await asyncio.gather(*tasks)
+
+        active_results = []
+        dead_results = []
         
-        # Process dengan progress
-        for coro in asyncio.as_completed(tasks):
-            is_alive, p, delay = await coro
-            completed += 1
-            
+        for is_alive, p, delay in results:
             line = f"{p['ip']},{p['port']},{p['country']},{p['isp']}"
             if is_alive:
-                active_results.append(f"{line},{delay}ms" if delay else line)
-                print(f"✅ [{completed}/{total}] {line} | {delay}ms", flush=True)
+                active_results.append(line)
             else:
                 dead_results.append(line)
-                if completed % 50 == 0:  # Print progress setiap 50 probe
-                    print(f"⏳ Progress: {completed}/{total} ({completed/total*100:.1f}%)", flush=True)
-    
-    # Simpan hasil
-    with open(OUTPUT_ACTIVE, 'w') as f: 
-        f.write("\n".join(active_results))
-    with open(OUTPUT_DEAD, 'w') as f: 
-        f.write("\n".join(dead_results))
-    
-    scan_duration = time.time() - start_scan
-    
+
+    # Simpan hasil dengan menghindari duplikat
+    new_active_count, new_dead_count = save_results(active_results, dead_results)
+
     print("\n" + "="*50, flush=True)
-    print(f"📊 HASIL SCAN:", flush=True)
-    print(f"   ✅ Active: {len(active_results)} proxy", flush=True)
-    print(f"   ❌ Dead: {len(dead_results)} proxy", flush=True)
-    print(f"   ⏱️  Waktu: {scan_duration:.2f} detik", flush=True)
+    print(f"📊 HASIL SCAN INI: ✅ {len(active_results)} | ❌ {len(dead_results)}", flush=True)
+    print(f"📝 YANG DISIMPAN (BANYAK): ✅ {new_active_count} | ❌ {new_dead_count}", flush=True)
     print("="*50, flush=True)
 
 if __name__ == "__main__":
+    start_time = time.time()
     asyncio.run(main())
+    print(f"⏱️ Selesai dalam {time.time() - start_time:.2f} detik", flush=True)
