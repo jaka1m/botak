@@ -19645,3 +19645,54 @@
 92.223.44.19,2096,UZ,G-Core Labs SA
 103.45.232.251,50678,VN,Maxserver Company Limited
 4.221.60.243,2053,ZA,Microsoft Corporation
+103.6.207.108,8080,ID,PT Pusat Media Indonesia
+129.154.54.67,19567,KR,Oracle Cloud
+193.122.126.64,53777,KR,Oracle Cloud
+23.94.57.31,443,US,Cloudflare Warp
+23.94.43.51,443,US,ColoCrossing
+147.46.31.247,30070,KR,Seoul National University
+89.248.207.37,443,RU,OOO Network of data-centers Selectel
+139.162.133.162,31956,DE,Akamai Connected Cloud
+139.162.133.162,25351,DE,Akamai Connected Cloud
+139.162.133.162,56661,DE,Akamai Connected Cloud
+139.162.133.162,42865,DE,Akamai Connected Cloud
+139.162.133.162,31804,DE,Akamai Connected Cloud
+139.162.133.162,48805,DE,Akamai Connected Cloud
+139.162.133.162,11511,DE,Akamai Connected Cloud
+139.162.133.162,32856,DE,Akamai Connected Cloud
+139.162.133.162,58990,DE,Akamai Connected Cloud
+139.162.133.162,24461,DE,Akamai Connected Cloud
+139.162.133.162,41419,DE,Akamai Connected Cloud
+139.162.133.162,42779,DE,Akamai Connected Cloud
+139.162.133.162,17001,DE,Akamai Connected Cloud
+139.162.133.162,34956,DE,Akamai Connected Cloud
+139.162.133.162,25657,DE,Akamai Connected Cloud
+139.162.133.162,51241,DE,Akamai Connected Cloud
+139.162.133.162,11285,DE,Akamai Connected Cloud
+139.162.133.162,46785,DE,Akamai Connected Cloud
+139.162.133.162,54591,DE,Akamai Connected Cloud
+139.162.133.162,26896,DE,Akamai Connected Cloud
+139.162.133.162,36355,DE,Akamai Connected Cloud
+139.162.133.162,34842,DE,Akamai Connected Cloud
+139.162.133.162,36075,DE,Akamai Connected Cloud
+139.162.133.162,55553,DE,Akamai Connected Cloud
+139.162.133.162,52982,DE,Akamai Connected Cloud
+139.162.133.162,58148,DE,Akamai Connected Cloud
+139.162.133.162,20091,DE,Akamai Connected Cloud
+139.162.133.162,27936,DE,Akamai Connected Cloud
+139.162.133.162,59963,DE,Akamai Connected Cloud
+139.162.133.162,15675,DE,Akamai Connected Cloud
+139.162.133.162,15458,DE,Akamai Connected Cloud
+45.95.232.18,8443,CH,Global Connectivity Solutions Llp
+45.95.232.18,2053,CH,Global Connectivity Solutions Llp
+206.53.48.171,443,GE,Cloud 9
+185.128.106.14,51820,RU,First Server
+104.168.35.194,56393,US,HostPapa
+45.80.208.126,8081,KZ,Cloudflare Warp
+192.9.135.182,7800,US,Oracle Cloud
+44.217.235.114,2053,US,Amazoncom
+35.230.79.26,443,US,Google Cloud
+91.197.0.117,8443,LV,Sia Veesp
+150.230.63.93,443,JP,Oracle Cloud
+64.181.240.173,443,US,Oracle Cloud
+104.129.181.152,443,CA,IT7 Networks Inc
